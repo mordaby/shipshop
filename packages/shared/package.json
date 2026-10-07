@@ -1,0 +1,13 @@
+{
+  "name": "@chatprint/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Types, catalog definitions, money helpers, config and i18n shared by every app",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@chatprint/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Remote MCP server (Streamable HTTP); thin client of the Core",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@chatprint/shared": "workspace:*"
+  }
+}
