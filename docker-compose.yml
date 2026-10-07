@@ -1,0 +1,42 @@
+# Local development services: Postgres and an S3-compatible store (RustFS).
+# Credentials come from .env (see .env.example); nothing secret lives here.
+# Start with `pnpm services:up`, then `pnpm storage:init` and `pnpm db:migrate`.
+name: chatprint
+
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_USER: chatprint
+      POSTGRES_DB: chatprint
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?Set LOCAL_POSTGRES_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chatprint -d chatprint']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  storage:
+    image: rustfs/rustfs:1.0.1
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY_ID:?Set STORAGE_ACCESS_KEY_ID in .env}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_ACCESS_KEY:?Set STORAGE_SECRET_ACCESS_KEY in .env}
+      RUSTFS_CONSOLE_ENABLE: 'true'
+    ports:
+      - '127.0.0.1:9000:9000' # S3 API
+      - '127.0.0.1:9001:9001' # web console
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:9000/health/ready']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
+  storage-data:

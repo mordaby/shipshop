@@ -12,25 +12,41 @@ Products, in order: a small canvas (Milestone 1), posters (Milestone 2), a short
 
 "chatprint" is a placeholder codename until the product has a name.
 
-## Repository layout (planned)
-
-The repo holds only docs so far. The first task is to scaffold this layout:
+## Repository layout
 
 ```
 apps/
   core/         Core API: all business logic, prices, permissions, state machine, webhooks
+                (src/db: Drizzle schema, migrator, catalog seed; migrations/: generated SQL;
+                src/storage: private object storage with signed URLs)
   mcp-server/   Remote MCP server (Streamable HTTP); thin client of the Core
   web/          Website: landing, account, orders, checkout and legal pages; thin client of the Core
 packages/
-  shared/       Types, catalog definitions, money helpers, API client for the Core
+  shared/       Types, catalog definitions, money helpers, typed config, translations, API client for the Core
   providers/    FulfillmentProvider (Gelato adapter) and PaymentProvider (processor, PayPal) implementations
+                (./testing: fetch mock and Gelato response fixtures, for tests only)
 ```
 
 Stack: TypeScript everywhere, Node (current LTS), pnpm workspaces, Postgres (also hosts the job queue at first), S3-compatible storage with signed URLs, `sharp` for mockups, Vitest for tests. MCP: `@modelcontextprotocol/server` (v2) and `@modelcontextprotocol/ext-apps` for mockup cards. Support MCP protocol versions 2026-07-28 and 2025-11-25.
 
+Workspace packages export their TypeScript source (`exports` points at `src/`) and run with `tsx`; `tsc --build` only checks types and emits declarations. A production build comes with the hosting decision. All config goes through `packages/shared/src/config/env.ts`. Database: Drizzle ORM on `pg`, TypeScript 6 (typescript-eslint doesn't support 7 yet).
+
 ## Commands
 
-Fill this section in once the monorepo is scaffolded (install, dev, test, lint, typecheck, migrate) and keep it current.
+Node 24 (`.nvmrc`; 22.12+ works) and pnpm 10 (`corepack enable`).
+
+- `pnpm install`: install the workspace.
+- `cp .env.example .env` and fill in the local values its comments describe (local Postgres password, `DATABASE_URL`, `STORAGE_*`).
+- `pnpm services:up` / `pnpm services:down`: start or stop Postgres 18 and RustFS (S3-compatible) from `docker-compose.yml`, bound to 127.0.0.1.
+- `pnpm storage:init`: create the private dev bucket. Refuses to run in production.
+- `pnpm db:migrate`: apply migrations to `DATABASE_URL`, under an advisory lock.
+- `pnpm db:generate`: after editing `apps/core/src/db/schema.ts`, write the next migration to `apps/core/migrations/` and commit it. A unit test fails when the schema and migrations drift apart.
+- `pnpm db:seed`: write the catalog. Looks up each variant's Gelato productUid live, so it needs `GELATO_API_KEY`.
+- `pnpm lint`, `pnpm typecheck`, `pnpm format` / `pnpm format:check`.
+- `pnpm test`: unit tests. No services or network: HTTP is mocked, database tests run on PGlite (Postgres in WebAssembly).
+- `pnpm test:integration`: tests against the docker-compose services (`*.integration.test.ts`), reading `.env`.
+- `pnpm check`: format check, lint, typecheck and unit tests. Run it before calling a task done.
+- No dev server yet: the Core API arrives in task 5.
 
 ## Hard rules
 
@@ -108,4 +124,22 @@ Do not pick these silently. Build behind an interface, leave a clear `TODO(decis
 
 ## Progress
 
-Nothing built yet. Next: Milestone 1, task 1.
+**Done: Milestone 1, tasks 1–3.**
+
+- Task 1: pnpm workspace in the layout above, TypeScript project references, ESLint (typescript-eslint strict, type-aware) and Prettier, Vitest (unit and integration configs), `docker-compose.yml` with Postgres 18 and RustFS. `packages/shared` has money helpers, the typed config module (missing keys fail loudly, naming the variable), a translation layer (English and Hebrew), catalog definitions and print-size helpers.
+- Task 2: Drizzle schema and the first migration for the ten entities (14 tables: catalog variants and prices, per-size design preparations and quote items are their own tables). The database enforces non-negative integer money, supported currencies, one order per quote, one event per source and event ID, and no succeeded payment without the verified event that confirmed it. Order rows start at `awaiting_payment`; the Quote state is the `quotes` table. `pnpm db:seed` resolves the canvas's Gelato productUid through the product API: it checks the attributes against the live catalog, requires exactly one match, cross-checks the size, and confirms the product is printable and ships to IL.
+- Task 3: `ObjectStorage` with an S3 adapter. Uploads are presigned POSTs, so the store enforces the key, content type and size limit. Downloads are signed GETs: 15 minutes by default, 7 days (the SigV4 maximum) for providers. Server-side put, get, head and delete are included. Keys are built from UUIDs only. Verified against RustFS in the integration tests.
+
+**Needs a live check with real keys:**
+
+- `pnpm db:seed` with a real `GELATO_API_KEY`. The canvas attribute names and values in `packages/shared/src/catalog/definitions.ts` are unverified (`TODO(verify)`); if they're wrong, the seed lists the valid ones. Gelato's docs were unreachable from the cloud session, so response shapes follow the open-source `gelato-admin` and `gelato-api` type definitions.
+- Whether Gelato wants the canvas wrap edges inside the print file. This affects the print area.
+- Storage on the production S3 provider once hosting is chosen. Cloudflare R2 has no presigned POST, so it would need presigned PUT plus a size check after upload.
+
+**Open, needs a decision:**
+
+- Price list: the canvas has a placeholder price of ILS 249.00, marked `placeholder: true`. The seed refuses placeholders in production.
+- Launch countries beyond IL (`DESTINATION_COUNTRIES`).
+- Canvas size: 30 × 30 cm on a slim frame, taken from SPEC.md's examples. Changing it is a one-line edit.
+
+**Next:** Milestone 1, task 4 (provider interfaces, the Gelato fulfillment adapter, PayPal and the fake payment provider). `assertConfigured()` still needs wiring into Core startup in production; that comes with the Core server in task 5.

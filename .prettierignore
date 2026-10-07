@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+dist/
+coverage/
+apps/core/migrations/meta/
+# Exported from the living spec doc; keep its formatting so the two stay comparable.
+SPEC.md

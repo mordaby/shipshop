@@ -1,0 +1,13 @@
+{
+  "name": "@chatprint/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Website: landing, account, orders, checkout and legal pages; thin client of the Core",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@chatprint/shared": "workspace:*"
+  }
+}
