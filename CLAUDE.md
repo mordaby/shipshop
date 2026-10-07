@@ -52,6 +52,16 @@ These are not up for trade-offs. If a task seems to need breaking one, stop and 
 14. **Gelato limits.** Cache catalog, prices and shipment methods (default limit is 5,000 calls a day). Validate and truncate shipping addresses before sending: first and last name up to 25 characters, address line up to 35, city up to 30; postcode, country code and email required.
 15. **Generation quota** is enforced in the Core: X generations a month per phone-verified account, plus N per order. Previews are low resolution.
 
+## Real code, configured from the environment
+
+We build the production system from the first task. "Mock" applies only to tests, never to the application.
+
+- **Real integrations.** Use the real libraries and SDKs and make real HTTP calls to the documented endpoints: Postgres, an S3 client, Gelato v4, PayPal Orders v2, the official MCP SDK. Never put a fake where a real integration belongs.
+- **Configuration.** Every key and URL comes from environment variables through one typed config module, validated with a schema. Add each new key to `.env.example` with an empty value and a one-line comment.
+- **Missing keys fail loudly.** A missing key raises a clear error naming the variable when the feature that needs it runs (and at startup in production). Never fall back silently to a fake.
+- **Undecided vendors.** For the Israeli processor, SMS and email, and invoicing, write the interface, a dev-only provider selected explicitly by config (for example `PAYMENT_PROCESSOR=fake`, `SMS_PROVIDER=console`), and a `TODO(decision)` for the real adapter. Dev-only providers refuse to start when `NODE_ENV=production`. Gelato and PayPal are decided: write their real adapters.
+- **Sessions without keys** (cloud sessions have none): write the real code anyway, cover it with tests against mocked HTTP responses shaped like the documented API, and list in Progress what still needs a live check with real keys. The live checks run later on the local machine with a filled `.env`.
+
 ## Current target: Milestone 1, thin slice
 
 One product (a small canvas), upload only (the design comes from the user's own assistant or files), ordered from Claude through a custom connector. See SPEC.md, "Build order".
@@ -61,7 +71,7 @@ Tasks, roughly in order:
 1. Scaffold the monorepo: pnpm workspaces, TypeScript project references, lint, typecheck, Vitest, a `docker-compose` with Postgres and an S3-compatible store for local dev.
 2. Database schema and migrations for the ten entities in SPEC.md, "Data model". Seed the catalog with one small canvas size; look up its Gelato `productUid` through the product API rather than guessing.
 3. Storage adapter with signed upload and download URLs.
-4. Provider interfaces in `packages/providers`: `FulfillmentProvider` (`quote`, `createOrder`, `cancelOrder`, `getOrder`, webhook translation into Core events) with a Gelato adapter; `PaymentProvider` (`createCheckout`, `getPayment`, `refund`, webhook verification) with a fake provider for tests until the Israeli processor is chosen.
+4. Provider interfaces in `packages/providers`: `FulfillmentProvider` (`quote`, `createOrder`, `cancelOrder`, `getOrder`, webhook translation into Core events) with a real Gelato adapter; `PaymentProvider` (`createCheckout`, `getPayment`, `refund`, webhook verification) with a real PayPal adapter (sandbox in development, so M1 isn't blocked on the Israeli processor's onboarding) and the dev-only fake provider until the Israeli processor is chosen.
 5. Core API endpoints for M1: `GET /v1/catalog`, `POST /v1/designs`, `POST /v1/designs/{id}/check` (resolution and aspect ratio), `POST /v1/designs/{id}/mockups`, `POST /v1/quotes`, `POST /v1/orders`, `GET /v1/orders`, `GET /v1/orders/{id}`.
 6. Order state machine (SPEC.md, "Order lifecycle") with tests for every transition and exit.
 7. Webhooks: `/hooks/payments/{processor}` and `/hooks/gelato` into `EventLog`, then the queue, then the state machine.
@@ -81,7 +91,7 @@ Merchant apps for Shopify or Wix, Shopify as a backend, T-shirts, Israeli print 
 
 Do not pick these silently. Build behind an interface, leave a clear `TODO(decision)`, and ask:
 
-- Israeli payment processor (Hyp, Grow, Tranzila, CardCom or PayPlus) and PayPal setup
+- Israeli payment processor (Hyp, Grow, Tranzila, CardCom or PayPlus)
 - Image generation, upscaling and vision vendors, including commercial-use terms of their output
 - SMS and email provider (must support Israeli numbers)
 - Invoicing service (Israeli, with an API that supports allocation numbers)
@@ -94,3 +104,8 @@ Do not pick these silently. Build behind an interface, leave a clear `TODO(decis
 - Test what moves money or state: pricing, the state machine, webhook verification, idempotency, ownership checks.
 - Code, comments and docs in English. User-facing strings go through a translation layer from the start, since the site, checkout, emails and SMS will be in English and Hebrew (RTL).
 - Commit only when asked. Never commit `.env` or anything in it.
+- At the end of every session, update Progress below: what is done, what is left, and what needs a live check with real keys.
+
+## Progress
+
+Nothing built yet. Next: Milestone 1, task 1.
