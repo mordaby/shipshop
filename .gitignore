@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Environment and secrets (keep .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and test output
+*.log
+npm-debug.log*
+pnpm-debug.log*
+coverage/
+
+# Local data
+uploads/
+tmp/
+.data/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
